@@ -4,6 +4,16 @@ import { Injectable, signal } from "@angular/core";
     providedIn: 'root',
   })
   export class BackendPortService {
+    /**
+     * BackendPortService: Initialize and save the port for the OmnAIScope Backend 
+     * 
+     * Init function: Async receiving of Backend Port via IPC from the electron app 
+     * Init function should only be used once in the app initializer context (app.config.ts)
+     * 
+     * The port is saved as a signal and can be used throughout the whole application. 
+     * 
+     * If no electron environment is used a warning is printed. 
+     */
     port = signal<number | null>(null); 
 
     async init():Promise<void>{
