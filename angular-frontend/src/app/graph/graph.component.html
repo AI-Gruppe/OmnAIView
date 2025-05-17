@@ -2,7 +2,7 @@
     <g [attr.transform]="marginTransform()">
 
         <g #xAxis [attr.transform]="xAxisTransformString()">
-          
+
         </g>
         <g #yAxis [attr.transform]="yAxisTransformString()"></g>
         @for (path of dataservice.paths(); track $index) {
@@ -18,22 +18,22 @@
 
     <div>
         <strong>X Scale Domain:</strong>
-        <pre>{{ dataservice.xScale().domain() | json }}</pre>
+        <pre>{{ dataservice.scale().xScale.domain() | json }}</pre>
     </div>
 
     <div>
         <strong>X Scale Range:</strong>
-        <pre>{{ dataservice.xScale().range() | json }}</pre>
+        <pre>{{ dataservice.scale().xScale.range() | json }}</pre>
     </div>
 
     <div>
         <strong>Y Scale Domain:</strong>
-        <pre>{{ dataservice.yScale().domain() | json }}</pre>
+        <pre>{{ dataservice.scale().yScale.domain() | json }}</pre>
     </div>
 
     <div>
         <strong>Y Scale Range:</strong>
-        <pre>{{ dataservice.yScale().range() | json }}</pre>
+        <pre>{{ dataservice.scale().yScale.range() | json }}</pre>
     </div>
 
     <div>
@@ -49,6 +49,11 @@
     <div>
         <strong>Graph Dimensions:</strong>
         <pre>{{ dataservice.graphDimensions() | json }}</pre>
+    </div>
+
+    <div>
+        <strong>Path:</strong>
+        <pre>{{ dataservice.paths() | json }}</pre>
     </div>
 
 </div>

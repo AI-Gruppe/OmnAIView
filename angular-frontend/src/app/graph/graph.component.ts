@@ -56,26 +56,26 @@ export class GraphComponent {
   })
 
   xAxisTransformString = computed(() => {
-    const yScale = this.dataservice.yScale();
+    const yScale = this.dataservice.scale().yScale;
     return `translate(0, ${yScale.range()[0]})`; // for d3, (0,0) is the upper left hand corner. When looking at data, the lower left hand corner is (0,0)
   });
 
   yAxisTransformString = computed(() => {
-    const xScale = this.dataservice.xScale();
+    const xScale = this.dataservice.scale().xScale;
     return `translate(${xScale.range()[0]}, 0)`;
   });
 
 
   updateXAxisInCanvas = effect(() => {
     if (!this.isInBrowser) return;
-    const x = this.dataservice.xScale()
+    const x = this.dataservice.scale().xScale
     const g = this.axesContainer().nativeElement;
     select(g).transition(transition()).duration(300).call(axisBottom(x));
   });
 
   updateYAxisInCanvas = effect(() => {
     if(!this.isInBrowser) return;
-    const y = this.dataservice.yScale();
+    const y = this.dataservice.scale().yScale;
     const g = this.axesYContainer().nativeElement;
     select(g).transition(transition()).duration(300).call(axisLeft(y));
   });
