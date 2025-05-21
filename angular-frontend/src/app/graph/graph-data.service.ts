@@ -88,33 +88,29 @@ export class DataSourceService {
     }
   }
 
+  readonly worker = new Worker(new URL('./webworker', import.meta.url));
+  updatePaths = effect(()=>{
+    const dimensions = this.$graphDimensions();
+    const domain = this.$domain();
+    const series = this.dummySeries();
+     this.worker.postMessage({
+      dimensions,
+      domain,
+      series,
+    })
+  })
+  readonly paths = signal<{id:string, d:string}[]>([]);
+  constructor() {
+    this.worker.addEventListener("message", (e) =>{
+      if (!Array.isArray(e.data)) {
+        console.error("recieved invalid path data from webworker: ", e.data);
+        return;
+      }
+      this.paths.set(e.data);
+    })
+    this.worker.addEventListener("messageerror", (e) =>{
+      console.error("recieved error from webworker: ", e);
+    })
   }
-
-  readonly paths = linkedSignal({
-    source: () => ({
-      scale: this.scale(),
-      series: this.dummySeries(),
-    }),
-    computation: ({ scale, series }) => {
-      const lineGen = d3Line<{ time: Date; value: number }>()
-        .x(d => scale.xScale(d.time))
-        .y(d => scale.yScale(d.value));
-
-      return Object.entries(series).map(([key, points]) => {
-        const parsedValues = points.map(({ timestamp, value }) => ({
-          time: new Date(timestamp),
-          value,
-        }));
-
-        const pathData = lineGen(parsedValues) ?? ''; 
-        return {
-          id: key,
-          d: pathData,
-        };
-      });
-    },
-  });
-
-
 
 }
