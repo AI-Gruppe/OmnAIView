@@ -1,7 +1,7 @@
 // server-communication.service.ts
 import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { DataSource } from '../../source-selection/data-source-selection.service';
+import { DataInfo, DataSource } from '../../source-selection/data-source-selection.service';
 
 interface DeviceInformation {
   UUID: string;
@@ -47,6 +47,7 @@ export class OmnAIScopeDataService implements DataSource{
   readonly isConnected = signal<boolean>(false);
   readonly devices = signal<DeviceInformation[]>([]);
   readonly data = signal<Record<string, DataFormat[]>>({});
+  readonly info = signal({info: new DataInfo()});
   readonly dataAsList = computed(() => {
     const allDataPoints: DataFormat[] = [];
     const dataRecord = this.data();
@@ -93,6 +94,7 @@ export class OmnAIScopeDataService implements DataSource{
     this.socket.addEventListener('open', () => {
       this.isConnected.set(true);
       this.data.set({});
+      this.info.set({info: new DataInfo()});
 
       // Send start message
       const deviceUuids = this.devices().map(device => device.UUID).join(" ");
@@ -124,6 +126,16 @@ export class OmnAIScopeDataService implements DataSource{
             }));
             records[uuid] = existingData.concat(newDataPoints);
           });
+        const info = this.info().info;
+        parsedMessage.data.forEach((currentValue:any) => {
+          currentValue.value.forEach((currentValue:number) => {
+            if (currentValue > info.maxValue) {info.maxValue = currentValue; this.lastUpdateChangedInfo = true; }
+            if (currentValue < info.minValue) {info.minValue = currentValue; this.lastUpdateChangedInfo = true; }
+          });
+          if (currentValue.timestamp < info.minTimestamp) {info.minTimestamp = currentValue.timestamp; this.lastUpdateChangedInfo = true; }
+          if (currentValue.timestamp > info.maxTimestamp) {info.maxTimestamp = currentValue.timestamp; this.lastUpdateChangedInfo = true; }
+        });
+        this.info.set({info: info});
 
           return { ...records };
         });
