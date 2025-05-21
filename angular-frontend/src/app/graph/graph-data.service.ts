@@ -1,9 +1,9 @@
 import { computed, effect, inject, Injectable, linkedSignal, signal, untracked } from '@angular/core';
 import { scaleLinear as d3ScaleLinear, scaleUtc as d3ScaleUtc } from 'd3-scale';
 import { line as d3Line } from 'd3-shape';
-import {  OmnAIScopeDataService } from '../omnai-datasource/omnai-scope-server/live-data.service';
+import {DataFormat, OmnAIScopeDataService} from '../omnai-datasource/omnai-scope-server/live-data.service';
 import { type GraphComponent } from './graph.component';
-import { DataSourceSelectionService } from '../source-selection/data-source-selection.service';
+import {DataInfo, DataSourceSelectionService} from '../source-selection/data-source-selection.service';
 
 type UnwrapSignal<T> = T extends import('@angular/core').Signal<infer U> ? U : never;
 
@@ -13,48 +13,70 @@ type UnwrapSignal<T> = T extends import('@angular/core').Signal<infer U> ? U : n
 @Injectable()
 export class DataSourceService {
   private readonly $graphDimensions = signal({ width: 800, height: 600 });
-  private readonly $xDomain = signal([new Date(2020), new Date()]);
-  private readonly $yDomain = signal([0, 100]);
+  private readonly $domain = computed(() => {
+      const info = this.info();
+      if (!info || !isFinite(info.info.minTimestamp) || !isFinite(info.info.maxTimestamp) || !isFinite(info.info.minValue) || !isFinite(info.info.maxValue))
+        return {
+          xDomain: [new Date(2020), new Date()],
+          yDomain: [0, 100],
+        };
+
+      const result = info.info;
+      const expandBy = 0.1;
+
+      const xDomainRange = result.maxTimestamp - result.minTimestamp;
+      const xExpansion = xDomainRange * expandBy;
+
+      const yDomainRange = result.maxValue - result.minValue;
+      const yExpansion = yDomainRange * expandBy;
+
+      return {
+        xDomain: [
+          new Date(result.minTimestamp - xExpansion),
+          new Date(result.maxTimestamp + xExpansion),
+        ],
+        yDomain: [
+          result.minValue - yExpansion,
+          result.maxValue + yExpansion,
+        ],
+      }
+    }
+  );
   private readonly dataSourceSelectionService = inject(DataSourceSelectionService);
 
   private readonly dummySeries = computed(() => {
     const selectedSource = this.dataSourceSelectionService.currentSource();
-    if (!selectedSource) return {};
+    if (!selectedSource) return {data: new Map<string, DataFormat[]>()};
 
     return selectedSource.data();
+  });
+  private readonly info = computed(() => {
+    const selectedSource = this.dataSourceSelectionService.currentSource();
+    if (!selectedSource) return {info: new DataInfo()};
+
+    return selectedSource.info();
   });
 
 
   readonly margin = { top: 20, right: 30, bottom: 40, left: 60 };
   graphDimensions = this.$graphDimensions.asReadonly();
 
-  xScale = linkedSignal({
-    source: () => ({
-      dimensions: this.$graphDimensions(),
-      xDomain: this.$xDomain(),
-    }),
-    computation: ({ dimensions, xDomain }) => {
+  scale = computed(() => {
+      const dimensions = this.$graphDimensions();
+      const domain = this.$domain();
       const margin = { top: 20, right: 30, bottom: 40, left: 40 };
       const width = dimensions.width - margin.left - margin.right;
-      return d3ScaleUtc()
-        .domain(xDomain)
-        .range([0, width]);
-    },
-  });
-
-  yScale = linkedSignal({
-    source: () => ({
-      dimensions: this.$graphDimensions(),
-      yDomain: this.$yDomain(),
-    }),
-    computation: ({ dimensions, yDomain }) => {
-      const margin = { top: 20, right: 30, bottom: 40, left: 40 };
       const height = dimensions.height - margin.top - margin.bottom;
-      return d3ScaleLinear()
-        .domain(yDomain)
-        .range([height, 0]);
-    },
-  });
+      return {
+        xScale: d3ScaleUtc()
+          .domain(domain.xDomain)
+          .range([0, width]),
+        yScale: d3ScaleLinear()
+          .domain(domain.yDomain)
+          .range([height, 0]),
+      };
+    }
+  )
 
   updateGraphDimensions(settings: { width: number; height: number }) {
     const currentSettings = this.$graphDimensions();
@@ -66,78 +88,36 @@ export class DataSourceService {
     }
   }
 
- updateScalesWhenDataChanges = effect(() => {
-    const data = this.dummySeries();
-    untracked(() => this.scaleAxisToData(data))
+  readonly worker = new Worker(new URL('./webworker', import.meta.url));
+  private lastWorkerRequestDone:boolean = true;
+  updatePaths = effect(()=>{
+    const dimensions = this.$graphDimensions();
+    const domain = this.$domain();
+    const series = this.dummySeries();
+
+    //don't overwhelm the WebWorker.
+    if (!this.lastWorkerRequestDone) return;
+    this.lastWorkerRequestDone = false;
+    this.worker.postMessage({
+      dimensions,
+      domain,
+      series,
+    })
   })
-
-  private scaleAxisToData(data: UnwrapSignal<typeof this.dummySeries>) {
-    console.log(data)
-    if (Object.keys(data).length === 0) return;
-
-    const expandBy = 0.1;
-
-    const initial = {
-      minTimestamp: Number.POSITIVE_INFINITY,
-      maxTimestamp: Number.NEGATIVE_INFINITY,
-      minValue: Number.POSITIVE_INFINITY,
-      maxValue: Number.NEGATIVE_INFINITY
-    };
-
-    const allPoints = Object.values(data).flat(); // DataFormat[]
-
-    const result = allPoints.reduce((acc, point) => ({
-      minTimestamp: Math.min(acc.minTimestamp, point.timestamp),
-      maxTimestamp: Math.max(acc.maxTimestamp, point.timestamp),
-      minValue: Math.min(acc.minValue, point.value),
-      maxValue: Math.max(acc.maxValue, point.value),
-    }), initial);
-
-    if (!isFinite(result.minTimestamp) || !isFinite(result.minValue)) return;
-
-    const xDomainRange = result.maxTimestamp - result.minTimestamp;
-    const xExpansion = xDomainRange * expandBy;
-
-    this.$xDomain.set([
-      new Date(result.minTimestamp - xExpansion),
-      new Date(result.maxTimestamp + xExpansion),
-    ]);
-
-    const yDomainRange = result.maxValue - result.minValue;
-    const yExpansion = yDomainRange * expandBy;
-
-    this.$yDomain.set([
-      result.minValue - yExpansion,
-      result.maxValue + yExpansion,
-    ]);
+  readonly paths = signal<{id:string, d:string}[]>([]);
+  constructor() {
+    this.worker.addEventListener("message", (e) =>{
+      this.lastWorkerRequestDone = true;
+      if (!Array.isArray(e.data)) {
+        console.error("recieved invalid path data from webworker: ", e.data);
+        return;
+      }
+      this.paths.set(e.data);
+    })
+    this.worker.addEventListener("messageerror", (e) =>{
+      this.lastWorkerRequestDone = true;
+      console.error("recieved error from webworker: ", e);
+    })
   }
-
-  readonly paths = linkedSignal({
-    source: () => ({
-      xScale: this.xScale(),
-      yScale: this.yScale(),
-      series: this.dummySeries(),
-    }),
-    computation: ({ xScale, yScale, series }) => {
-      const lineGen = d3Line<{ time: Date; value: number }>()
-        .x(d => xScale(d.time))
-        .y(d => yScale(d.value));
-
-      return Object.entries(series).map(([key, points]) => {
-        const parsedValues = points.map(({ timestamp, value }) => ({
-          time: new Date(timestamp),
-          value,
-        }));
-
-        const pathData = lineGen(parsedValues) ?? ''; 
-        return {
-          id: key,
-          d: pathData,
-        };
-      });
-    },
-  });
-
-
 
 }

@@ -1,7 +1,7 @@
 // server-communication.service.ts
 import { HttpClient } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { DataSource } from '../../source-selection/data-source-selection.service';
+import { DataInfo, DataSource } from '../../source-selection/data-source-selection.service';
 
 interface DeviceInformation {
   UUID: string;
@@ -43,15 +43,18 @@ export class OmnAIScopeDataService implements DataSource{
   }
   
   private socket: WebSocket | null = null;
+  lastUpdate: number = 0;
+  lastUpdateChangedInfo = false;
 
   readonly isConnected = signal<boolean>(false);
   readonly devices = signal<DeviceInformation[]>([]);
-  readonly data = signal<Record<string, DataFormat[]>>({});
+  readonly data = signal({data: new Map()});
+  readonly info = signal({info: new DataInfo()});
   readonly dataAsList = computed(() => {
     const allDataPoints: DataFormat[] = [];
     const dataRecord = this.data();
 
-    for (const deviceData of Object.values(dataRecord)) {
+    for (const deviceData of dataRecord.data.values()) {
       allDataPoints.push(...deviceData);
     }
 
@@ -92,7 +95,8 @@ export class OmnAIScopeDataService implements DataSource{
 
     this.socket.addEventListener('open', () => {
       this.isConnected.set(true);
-      this.data.set({});
+      this.data.set({data: new Map()});
+      this.info.set({info: new DataInfo()});
 
       // Send start message
       const deviceUuids = this.devices().map(device => device.UUID).join(" ");
@@ -115,18 +119,41 @@ export class OmnAIScopeDataService implements DataSource{
       }
 
       if (this.isOmnAIDataMessage(parsedMessage)) {
-        this.data.update(records => {
-          parsedMessage.devices.forEach((uuid: string, index: number) => {
-            const existingData = records[uuid] ?? [];
-            const newDataPoints = parsedMessage.data.map((point: any) => ({
-              timestamp: point.timestamp,
-              value: point.value[index],
-            }));
-            records[uuid] = existingData.concat(newDataPoints);
-          });
+        let start = performance.now();
+        const timeToUpdate = 250;
 
-          return { ...records };
+        //Update info and Data, without causing any updates
+        const info = this.info().info;
+        parsedMessage.data.forEach((currentValue:any) => {
+          currentValue.value.forEach((currentValue:number) => {
+            if (currentValue > info.maxValue) {info.maxValue = currentValue; this.lastUpdateChangedInfo = true; }
+            if (currentValue < info.minValue) {info.minValue = currentValue; this.lastUpdateChangedInfo = true; }
+          });
+          if (currentValue.timestamp < info.minTimestamp) {info.minTimestamp = currentValue.timestamp; this.lastUpdateChangedInfo = true; }
+          if (currentValue.timestamp > info.maxTimestamp) {info.maxTimestamp = currentValue.timestamp; this.lastUpdateChangedInfo = true; }
         });
+
+        const data = this.data().data;
+        parsedMessage.devices.forEach((uuid: string, index: number) => {
+          if (!data.has(uuid)) data.set(uuid, []);
+          const newDataPoints:DataFormat[] = parsedMessage.data.map((point: any) => ({
+            timestamp: point.timestamp,
+            value: point.value[index],
+          }));
+          let record = data.get(uuid)!;
+          record.push(...newDataPoints);
+        });
+
+        //Update info & data, once every so often.
+        if (performance.now() > this.lastUpdate + timeToUpdate) {
+          if (this.lastUpdateChangedInfo)
+            this.info.set({info: info});
+          this.data.set({data: data});
+          this.lastUpdate = performance.now();
+        }
+        let end = performance.now();
+        // console.warn(`Message handing took ${end-start}`)
+
       } else {
         console.warn('Unbekanntes Nachrichtenformat:', parsedMessage);
       }
