@@ -43,6 +43,8 @@ export class OmnAIScopeDataService implements DataSource{
   }
   
   private socket: WebSocket | null = null;
+  lastUpdate: number = 0;
+  lastUpdateChangedInfo = false;
 
   readonly isConnected = signal<boolean>(false);
   readonly devices = signal<DeviceInformation[]>([]);
@@ -117,6 +119,10 @@ export class OmnAIScopeDataService implements DataSource{
       }
 
       if (this.isOmnAIDataMessage(parsedMessage)) {
+        let start = performance.now();
+        const timeToUpdate = 250;
+
+        //Update info and Data, without causing any updates
         const info = this.info().info;
         parsedMessage.data.forEach((currentValue:any) => {
           currentValue.value.forEach((currentValue:number) => {
@@ -126,7 +132,6 @@ export class OmnAIScopeDataService implements DataSource{
           if (currentValue.timestamp < info.minTimestamp) {info.minTimestamp = currentValue.timestamp; this.lastUpdateChangedInfo = true; }
           if (currentValue.timestamp > info.maxTimestamp) {info.maxTimestamp = currentValue.timestamp; this.lastUpdateChangedInfo = true; }
         });
-        this.info.set({info: info});
 
         const data = this.data().data;
         parsedMessage.devices.forEach((uuid: string, index: number) => {
@@ -138,7 +143,17 @@ export class OmnAIScopeDataService implements DataSource{
           let record = data.get(uuid)!;
           record.push(...newDataPoints);
         });
-        this.data.set({data: data});
+
+        //Update info & data, once every so often.
+        if (performance.now() > this.lastUpdate + timeToUpdate) {
+          if (this.lastUpdateChangedInfo)
+            this.info.set({info: info});
+          this.data.set({data: data});
+          this.lastUpdate = performance.now();
+        }
+        let end = performance.now();
+        // console.warn(`Message handing took ${end-start}`)
+
       } else {
         console.warn('Unbekanntes Nachrichtenformat:', parsedMessage);
       }
