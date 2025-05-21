@@ -46,13 +46,13 @@ export class OmnAIScopeDataService implements DataSource{
 
   readonly isConnected = signal<boolean>(false);
   readonly devices = signal<DeviceInformation[]>([]);
-  readonly data = signal<Record<string, DataFormat[]>>({});
+  readonly data = signal({data: new Map()});
   readonly info = signal({info: new DataInfo()});
   readonly dataAsList = computed(() => {
     const allDataPoints: DataFormat[] = [];
     const dataRecord = this.data();
 
-    for (const deviceData of Object.values(dataRecord)) {
+    for (const deviceData of dataRecord.data.values()) {
       allDataPoints.push(...deviceData);
     }
 
@@ -93,7 +93,7 @@ export class OmnAIScopeDataService implements DataSource{
 
     this.socket.addEventListener('open', () => {
       this.isConnected.set(true);
-      this.data.set({});
+      this.data.set({data: new Map()});
       this.info.set({info: new DataInfo()});
 
       // Send start message
@@ -117,15 +117,6 @@ export class OmnAIScopeDataService implements DataSource{
       }
 
       if (this.isOmnAIDataMessage(parsedMessage)) {
-        this.data.update(records => {
-          parsedMessage.devices.forEach((uuid: string, index: number) => {
-            const existingData = records[uuid] ?? [];
-            const newDataPoints = parsedMessage.data.map((point: any) => ({
-              timestamp: point.timestamp,
-              value: point.value[index],
-            }));
-            records[uuid] = existingData.concat(newDataPoints);
-          });
         const info = this.info().info;
         parsedMessage.data.forEach((currentValue:any) => {
           currentValue.value.forEach((currentValue:number) => {
@@ -137,8 +128,17 @@ export class OmnAIScopeDataService implements DataSource{
         });
         this.info.set({info: info});
 
-          return { ...records };
+        const data = this.data().data;
+        parsedMessage.devices.forEach((uuid: string, index: number) => {
+          if (!data.has(uuid)) data.set(uuid, []);
+          const newDataPoints:DataFormat[] = parsedMessage.data.map((point: any) => ({
+            timestamp: point.timestamp,
+            value: point.value[index],
+          }));
+          let record = data.get(uuid)!;
+          record.push(...newDataPoints);
         });
+        this.data.set({data: data});
       } else {
         console.warn('Unbekanntes Nachrichtenformat:', parsedMessage);
       }
