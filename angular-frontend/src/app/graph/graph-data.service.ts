@@ -1,10 +1,7 @@
 import { computed, effect, inject, Injectable, linkedSignal, signal, untracked } from '@angular/core';
 import { scaleLinear as d3ScaleLinear, scaleUtc as d3ScaleUtc } from 'd3-scale';
 import { line as d3Line } from 'd3-shape';
-import {  OmnAIScopeDataService } from '../omnai-datasource/omnai-scope-server/live-data.service';
-import { type GraphComponent } from './graph.component';
 import { DataSourceSelectionService } from '../source-selection/data-source-selection.service';
-import { timeFormat } from 'd3-time-format';
 
 type UnwrapSignal<T> = T extends import('@angular/core').Signal<infer U> ? U : never;
 
@@ -13,8 +10,8 @@ type UnwrapSignal<T> = T extends import('@angular/core').Signal<infer U> ? U : n
 @Injectable()
 export class DataSourceService {
   private readonly $graphDimensions = signal({ width: 800, height: 600 });
-  private readonly $xDomain = signal([new Date(0), new Date(0)]); 
-  private readonly $yDomain = signal([0, 100]); 
+  private readonly $xDomain = signal([new Date(0), new Date(0)]);
+  private readonly $yDomain = signal([0, 100]);
   private readonly dataSourceSelectionService = inject(DataSourceSelectionService);
   private firstTimestamp = 0;
 
@@ -138,7 +135,7 @@ export class DataSourceService {
           value,
         }));
 
-        const pathData = lineGen(parsedValues) ?? ''; 
+        const pathData = lineGen(parsedValues) ?? '';
         return {
           id: key,
           d: pathData,
