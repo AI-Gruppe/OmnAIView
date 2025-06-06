@@ -104,8 +104,8 @@ export class DataSourceService {
     }
     else {
       this.$xDomain.set([
-        new Date(0),
-        new Date(xDomainRange + xExpansion)
+        new Date(result.minTimestamp),
+        new Date(result.maxTimestamp)
       ]);
     }
 
@@ -131,7 +131,7 @@ export class DataSourceService {
 
       return Object.entries(series).map(([key, points]) => {
         const parsedValues = points.map(({ timestamp, value }) => ({
-          time: new Date(timestamp-this.firstTimestamp),
+          time: new Date(timestamp),
           value,
         }));
 
