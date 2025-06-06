@@ -22,7 +22,6 @@ export class DataSourceService {
   private readonly $xDomain = signal<xDomainTuple>(defaultXDomain);
   private readonly $yDomain = signal([0, 100]);
   private readonly dataSourceSelectionService = inject(DataSourceSelectionService);
-  private firstTimestamp = 0;
 
   private readonly dummySeries = computed(() => {
     const selectedSource = this.dataSourceSelectionService.currentSource();
