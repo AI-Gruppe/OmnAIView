@@ -19,6 +19,7 @@ import { DeviceListComponent } from "../omnai-datasource/omnai-scope-server/devi
 import { ResizeObserverDirective } from '../shared/resize-observer.directive';
 import { StartDataButtonComponent } from "../source-selection/start-data-from-source.component";
 import { DataSourceService } from './graph-data.service';
+import { makeXAxisTickFormatter } from './x-axis-formatter.utils';
 
 @Component({
   selector: 'app-graph',
@@ -76,14 +77,14 @@ export class GraphComponent {
   }
   updateXAxisInCanvas = effect(() => {
     if (!this.isInBrowser) return;
-    const formatElapsed = timeFormat('%M.%S');
-    const x = this.dataservice.xScale()
+    const x = this.dataservice.xScale();
+    const domain = x.domain();
+    const formatter = makeXAxisTickFormatter(this.xAxisTimeMode(), domain[0]);
     const g = this.axesContainer().nativeElement;
     select(g)
       .transition(transition())
-      .duration(300).
-      call(axisBottom(x).tickFormat(d =>
-        formatElapsed(new Date(Number(d)))));
+      .duration(300)
+      .call(axisBottom(x).tickFormat(formatter));
   });
 
   updateYAxisInCanvas = effect(() => {
