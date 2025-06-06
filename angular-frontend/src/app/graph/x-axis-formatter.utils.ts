@@ -1,7 +1,9 @@
 import { type NumberValue, timeFormat } from "d3";
 
+export type xAxisMode = 'absolute' | 'relative';
+
 export function makeXAxisTickFormatter(
-  mode: 'absolute' | 'relative',
+  mode: xAxisMode,
   domainStart: NumberValue | Date
 ): (domainValue: NumberValue | Date, index: number) => string {
   const formatAbsolute = timeFormat('%H:%M:%S');

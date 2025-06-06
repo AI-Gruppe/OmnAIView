@@ -19,7 +19,7 @@ import { DeviceListComponent } from "../omnai-datasource/omnai-scope-server/devi
 import { ResizeObserverDirective } from '../shared/resize-observer.directive';
 import { StartDataButtonComponent } from "../source-selection/start-data-from-source.component";
 import { DataSourceService } from './graph-data.service';
-import { makeXAxisTickFormatter } from './x-axis-formatter.utils';
+import { makeXAxisTickFormatter, type xAxisMode } from './x-axis-formatter.utils';
 
 @Component({
   selector: 'app-graph',
@@ -70,7 +70,7 @@ export class GraphComponent {
   /**
    * Signal to control the x-axis time mode. Relative starts with 0, absolute reflects the time of day the data was recorded.
    */
-  readonly xAxisTimeMode = signal<"absolute" | "relative">("absolute");
+  readonly xAxisTimeMode = signal<xAxisMode>("absolute");
 
   onXAxisTimeModeToggle(checked: boolean): void {
     this.xAxisTimeMode.set(checked ? 'relative' : 'absolute');
