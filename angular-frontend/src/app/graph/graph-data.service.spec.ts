@@ -1,12 +1,19 @@
 import { TestBed } from '@angular/core/testing';
 
 import { DataSourceService } from './graph-data.service';
+import {signal} from '@angular/core';
+import {DataInfo} from '../source-selection/data-source-selection.service';
+import {provideHttpClient} from '@angular/common/http';
 
 describe('GraphDataService', () => {
   let service: DataSourceService;
 
-  beforeEach(() => {
-    TestBed.configureTestingModule({});
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient()
+      ],
+    }).compileComponents();
     service = TestBed.inject(DataSourceService);
   });
 
@@ -14,21 +21,26 @@ describe('GraphDataService', () => {
     expect(service).toBeTruthy();
   });
   it('should correctly scale axis based on data', () => {
-    const mockData = {
-      device1: [
-        { timestamp: 1000, value: 10 },
-        { timestamp: 2000, value: 20 },
-      ],
-      device2: [
-        { timestamp: 1500, value: 15 },
-      ],
-    };
+    let info = new DataInfo();
+    info.minValue = 10;
+    info.maxValue = 20;
+    info.minTimestamp = 1000;
+    info.maxTimestamp = 2000;
 
-    // scaleAxisToData ist private -> Aufruf über cast
-    (service as any).scaleAxisToData(mockData);
+    (service as any).dataSourceSelectionService._currentSource.set({
+      id: 'test-source',
+      name: 'Testing Source',
+      description: 'Data-Source used for testing',
+      connect: ()=> {},
+      data: signal({
+        data: new Map(),
+        info
+      }),
+    });
 
-    const xDomain = service['$xDomain']();
-    const yDomain = service['$yDomain']();
+    const domain = service.domain();
+    const xDomain = domain.xDomain;
+    const yDomain = domain.yDomain;
 
     // xDomain und yDomain sollten angepasst sein
     expect(xDomain[0].getTime()).toBeLessThanOrEqual(1000);
