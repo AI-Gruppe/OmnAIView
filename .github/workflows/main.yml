@@ -45,7 +45,7 @@ jobs:
         run: npm run build
       - name: Test Angular
         working-directory: angular-frontend
-        run: npx ng test
+        run: npx ng test --single-run
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
