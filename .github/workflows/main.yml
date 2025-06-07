@@ -49,7 +49,7 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OmnaiView-Windows-${{ github.ref_name }}
+          name: OmnaiView-Windows-${{ github.sha }}
           path: |
             electron\out\make\squirrel.windows\x64\RELEASES
             electron\out\make\squirrel.windows\x64\*.nupkg
