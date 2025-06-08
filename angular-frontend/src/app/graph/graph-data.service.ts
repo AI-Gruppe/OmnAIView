@@ -1,19 +1,25 @@
 import { computed, effect, inject, Injectable, linkedSignal, signal, untracked } from '@angular/core';
 import { scaleLinear as d3ScaleLinear, scaleUtc as d3ScaleUtc } from 'd3-scale';
 import { line as d3Line } from 'd3-shape';
-import {  OmnAIScopeDataService } from '../omnai-datasource/omnai-scope-server/live-data.service';
-import { type GraphComponent } from './graph.component';
 import { DataSourceSelectionService } from '../source-selection/data-source-selection.service';
 
 type UnwrapSignal<T> = T extends import('@angular/core').Signal<infer U> ? U : never;
 
 /**
+ * Describes the potential Domain values for the x-axis
+ * */
+type xDomainType = Date;
+type xDomainTuple = [xDomainType, xDomainType];
+
+const defaultXDomain: xDomainTuple = [new Date(), new Date(Date.now() - 24 * 60 * 60 * 1000)];
+
+/**
  * Provide the data to be displayed in the {@link GraphComponent}
- */
+ *  */
 @Injectable()
 export class DataSourceService {
   private readonly $graphDimensions = signal({ width: 800, height: 600 });
-  private readonly $xDomain = signal([new Date(2020), new Date()]);
+  private readonly $xDomain = signal<xDomainTuple>(defaultXDomain);
   private readonly $yDomain = signal([0, 100]);
   private readonly dataSourceSelectionService = inject(DataSourceSelectionService);
 
@@ -53,6 +59,7 @@ export class DataSourceService {
       return d3ScaleLinear()
         .domain(yDomain)
         .range([height, 0]);
+
     },
   });
 
@@ -66,7 +73,7 @@ export class DataSourceService {
     }
   }
 
- updateScalesWhenDataChanges = effect(() => {
+  updateScalesWhenDataChanges = effect(() => {
     const data = this.dummySeries();
     untracked(() => this.scaleAxisToData(data))
   })
@@ -94,14 +101,17 @@ export class DataSourceService {
     }), initial);
 
     if (!isFinite(result.minTimestamp) || !isFinite(result.minValue)) return;
-
     const xDomainRange = result.maxTimestamp - result.minTimestamp;
     const xExpansion = xDomainRange * expandBy;
-
-    this.$xDomain.set([
-      new Date(result.minTimestamp - xExpansion),
-      new Date(result.maxTimestamp + xExpansion),
-    ]);
+    if (xDomainRange === 0) {
+      this.$xDomain.set(defaultXDomain);
+    }
+    else {
+      this.$xDomain.set([
+        new Date(result.minTimestamp),
+        new Date(result.maxTimestamp)
+      ]);
+    }
 
     const yDomainRange = result.maxValue - result.minValue;
     const yExpansion = yDomainRange * expandBy;
@@ -129,7 +139,7 @@ export class DataSourceService {
           value,
         }));
 
-        const pathData = lineGen(parsedValues) ?? ''; 
+        const pathData = lineGen(parsedValues) ?? '';
         return {
           id: key,
           d: pathData,
@@ -137,7 +147,4 @@ export class DataSourceService {
       });
     },
   });
-
-
-
 }
